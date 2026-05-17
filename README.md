@@ -1,6 +1,6 @@
 # SQL Table Exporter
 
-A high-performance .NET utility for exporting large SQL Server tables to CSV files with built-in pagination, restartability, schema script generation, and ultra-compressed archiving.
+A high-performance .NET CLI tool for exporting large SQL Server tables to CSV files with built-in pagination, restartability, schema script generation, and ultra-compressed archiving.
 
 ## Features
 
@@ -15,76 +15,79 @@ A high-performance .NET utility for exporting large SQL Server tables to CSV fil
 
 ## Requirements
 
-- .NET 10.0 or later
-- Windows operating system
+- .NET 10.0 runtime (Windows, Linux, or macOS)
 - SQL Server database access
 - Appropriate permissions to read from the tables you want to export
 
 ## Installation
 
-Download the SQLTableExporter executable from the releases page
+Install as a global .NET tool:
+
+```bash
+dotnet tool install --global AnujShroff.SQLTableExporter
+```
 
 ## Usage
 
 ```bash
-SQLTableExporter [OPTIONS] [OUTPUT_DIRECTORY]
+sqltableexporter [OPTIONS] [OUTPUT_DIRECTORY]
 ```
 
 ### Basic Examples
 
 Minimum required parameters:
 ```bash
-SQLTableExporter -c "Server=myserver.database.windows.net;Database=mydb;Authentication=Active Directory Default;" -s dbo -t Products
+sqltableexporter -c "Server=myserver.database.windows.net;Database=mydb;Authentication=Active Directory Default;" -s dbo -t Products
 ```
 
 Export to a specific directory:
 ```bash
-SQLTableExporter -c "connection-string" -s dbo -t Products -o ./exports
+sqltableexporter -c "connection-string" -s dbo -t Products -o ./exports
 ```
 
 Use snapshot isolation for a consistent view of data during export:
 ```bash
-SQLTableExporter -c "connection-string" -s dbo -t Orders --snapshot-isolation
+sqltableexporter -c "connection-string" -s dbo -t Orders --snapshot-isolation
 ```
 
 Use parameterized WHERE conditions for safer queries:
 ```bash
-SQLTableExporter -c "connection-string" -s dbo -t Orders -w "OrderDate > :minDate AND Total > :minTotal" --param minDate=2023-01-01 --param minTotal=1000
+sqltableexporter -c "connection-string" -s dbo -t Orders -w "OrderDate > :minDate AND Total > :minTotal" --param minDate=2023-01-01 --param minTotal=1000
 ```
 
 Customize performance settings:
 ```bash
-SQLTableExporter -c "connection-string" -s dbo -t LargeTable -b 100000 -d 100 --timeout 7200
+sqltableexporter -c "connection-string" -s dbo -t LargeTable -b 100000 -d 100 --timeout 7200
 ```
 
 Customize file chunking:
 ```bash
-SQLTableExporter -c "connection-string" -s dbo -t Orders --rows 500000
+sqltableexporter -c "connection-string" -s dbo -t Orders --rows 500000
 ```
 
 Export without progress tracking or schema script generation:
 ```bash
-SQLTableExporter -c "connection-string" -s dbo -t Products --no-progress-tracking --no-schema-script
+sqltableexporter -c "connection-string" -s dbo -t Products --no-progress-tracking --no-schema-script
 ```
 
 Resume a previously interrupted export:
 ```bash
-SQLTableExporter -c "connection-string" -s dbo -t LargeTable --restart
+sqltableexporter -c "connection-string" -s dbo -t LargeTable --restart
 ```
 
 Archive output:
 ```bash
-SQLTableExporter -c "connection-string" -s dbo -t Orders --archive
+sqltableexporter -c "connection-string" -s dbo -t Orders --archive
 ```
 
 Upload export results to Azure Blob Storage:
 ```bash
-SQLTableExporter -c "connection-string" -s dbo -t Products --azure-blob-storage "https://mystorageaccount.blob.core.windows.net/mycontainer"
+sqltableexporter -c "connection-string" -s dbo -t Products --azure-blob-storage "https://mystorageaccount.blob.core.windows.net/mycontainer"
 ```
 
 Upload archived export results to Azure Blob Storage:
 ```bash
-SQLTableExporter -c "connection-string" -s dbo -t Products --archive --azure-blob-storage "https://mystorageaccount.blob.core.windows.net/mycontainer"
+sqltableexporter -c "connection-string" -s dbo -t Products --archive --azure-blob-storage "https://mystorageaccount.blob.core.windows.net/mycontainer"
 ```
 
 ## Command-Line Options
@@ -111,33 +114,27 @@ SQLTableExporter -c "connection-string" -s dbo -t Products --archive --azure-blo
 | `-w, --where`            | Optional WHERE condition to filter data                          | None           |
 | `--param`                | Parameter value for WHERE condition                              | None           |
 
-## Self-Management Commands
+## Updating
 
-These commands are used to manage the application itself:
-
-| Command                  | Description                                                    |
-|--------------------------|----------------------------------------------------------------|
-| `update`                 | Checks for a newer version and initiates update if available   |
-| `version`                | Displays the current version of the application                |
-
-### Update Command
+On every run, the tool checks NuGet for a newer published version. If one is available, it prints a banner at the end of execution telling you to run:
 
 ```bash
-SQLTableExporter update
+dotnet tool update --global AnujShroff.SQLTableExporter
 ```
 
-When executed, this command checks if a newer version is available:
-- If an update is found, it displays the new version number and automatically starts the update process
-- If no update is available, it reports "No new updates"
-- If the update check fails, it reports an error
+The check is non-blocking, fails silently on network errors, and skips prereleases. There is no opt-out flag — the check is cheap and runs in the background while the export proceeds.
 
-### Version Command
+To see the installed version, use the standard dotnet tools command:
 
 ```bash
-SQLTableExporter version
+dotnet tool list --global
 ```
 
-Displays the current version of SQLTableExporter in the format of `Major.Minor`.
+To uninstall:
+
+```bash
+dotnet tool uninstall --global AnujShroff.SQLTableExporter
+```
 
 ## Output Files
 
@@ -230,4 +227,4 @@ If an error occurs, the tool will display the error message and stack trace. Whe
 By default, the tool will:
 1. Create a directory named `{schema}_{table}_export` if no output directory is specified
 2. Ensure the output directory is empty before starting (unless using `--restart`)
-3. If archiving is enabled, create an archive file named `{schema}_{table}_export.zip` in the current directory
+3. If archiving is enabled, create an archive file named `{schema}_{table}_export.zip` in the current working directory (i.e. the shell directory from which `sqltableexporter` was invoked)
