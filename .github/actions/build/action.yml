@@ -1,0 +1,126 @@
+name: 'Build'
+description: 'Build'
+inputs:
+  CONFIGURATION:
+    required: false
+    default: 'Release'
+  DOTNET_CORE_VERSION:
+    required: false
+    default: '10.x'
+  AZURE_CLIENT_ID:
+    required: true
+  AZURE_TENANT_ID:
+    required: true
+  AZURE_SUBSCRIPTION_ID:
+    required: true
+  TRUSTED_SIGNING_ENDPOINT:
+    required: true
+  TRUSTED_SIGNING_ACCOUNT:
+    required: true
+  TRUSTED_SIGNING_CERTIFICATE_PROFILE:
+    required: true
+  NUGET_DIRECTORY:
+    required: false
+    default: './nuget-packages'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: ${{ inputs.DOTNET_CORE_VERSION }}
+
+    - name: Run Branch Release Versioning
+      id: nextversion
+      uses: ./.github/actions/versioning
+
+    - name: Build
+      run: dotnet build --configuration ${{ inputs.CONFIGURATION }} -p:Version=${{ steps.nextversion.outputs.VERSION }} -p:AssemblyVersion=${{ steps.nextversion.outputs.ASSEMBLYSEMVER }}
+      shell: bash
+
+    - name: Azure Login
+      uses: azure/login@v3
+      with:
+        client-id: ${{ inputs.AZURE_CLIENT_ID }}
+        tenant-id: ${{ inputs.AZURE_TENANT_ID }}
+        subscription-id: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Install Sign CLI
+      run: dotnet tool install --global sign --prerelease
+      shell: bash
+
+    - name: Sign SQLTableExporter.dll
+      run: |
+        sign code artifact-signing `
+          -ase "${{ inputs.TRUSTED_SIGNING_ENDPOINT }}" `
+          -asa "${{ inputs.TRUSTED_SIGNING_ACCOUNT }}" `
+          -ascp "${{ inputs.TRUSTED_SIGNING_CERTIFICATE_PROFILE }}" `
+          src/SQLTableExporter/bin/${{ inputs.CONFIGURATION }}/net10.0/SQLTableExporter.dll
+      shell: pwsh
+
+    - name: Nuget Pack
+      run: |
+          dotnet pack --no-build --no-restore -p:PackageVersion=${{ steps.nextversion.outputs.VERSION }} --configuration ${{ inputs.CONFIGURATION }} --output ${{ inputs.NUGET_DIRECTORY }}
+      shell: bash
+
+    - name: Sign NuGet Package
+      run: |
+        sign code artifact-signing `
+          -ase "${{ inputs.TRUSTED_SIGNING_ENDPOINT }}" `
+          -asa "${{ inputs.TRUSTED_SIGNING_ACCOUNT }}" `
+          -ascp "${{ inputs.TRUSTED_SIGNING_CERTIFICATE_PROFILE }}" `
+          ${{ inputs.NUGET_DIRECTORY }}/*.nupkg
+      shell: pwsh
+
+    - name: Extract Signing Certificate
+      run: |
+        pip install asn1crypto
+        python -c "
+        from asn1crypto import cms as asn1_cms
+        import zipfile, glob
+
+        package = glob.glob('${{ inputs.NUGET_DIRECTORY }}/*.nupkg')[0]
+        with zipfile.ZipFile(package, 'r') as zip_ref:
+            signature_data = zip_ref.read('.signature.p7s')
+        certificates = asn1_cms.ContentInfo.load(signature_data)['content']['certificates']
+        for cert in certificates:
+            cn = cert.chosen['tbs_certificate']['subject'].native.get('common_name', '')
+            if cn == 'Anuj Shroff':
+                with open('signing-cert.cer', 'wb') as f:
+                    f.write(cert.dump())
+                print(f'Extracted leaf certificate for: {cn}')
+                break
+        "
+      shell: bash
+
+    - name: Upload Signing Certificate
+      uses: actions/upload-artifact@v7
+      with:
+        name: signing-certificate
+        path: signing-cert.cer
+
+    - name: Wait for certificate registration
+      run: |
+        echo "Upload the certificate above to NuGet.org, then wait for this step to complete."
+        sleep 300
+      shell: bash
+
+    - name: NuGet Login
+      uses: NuGet/login@v1
+      id: nuget-login
+      with:
+        user: anujshroff
+
+    - name: Nuget Push
+      run: |
+          dotnet nuget push ${{ inputs.NUGET_DIRECTORY }}/*.nupkg --source "https://api.nuget.org/v3/index.json" --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+      shell: bash
+
+    - name: Push Git Tag
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "github-actions@users.noreply.github.com"
+        git tag v${{ steps.nextversion.outputs.VERSION }}
+        git push origin v${{ steps.nextversion.outputs.VERSION }}
+      shell: bash
