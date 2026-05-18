@@ -228,3 +228,7 @@ By default, the tool will:
 1. Create a directory named `{schema}_{table}_export` if no output directory is specified
 2. Ensure the output directory is empty before starting (unless using `--restart`)
 3. If archiving is enabled, create an archive file named `{schema}_{table}_export.zip` in the current working directory (i.e. the shell directory from which `sqltableexporter` was invoked)
+
+## AI Notice
+
+This project was entirely generated using AI, leveraging **Claude Code** by Anthropic. It serves as a testament to the capabilities of modern AI in automating complex development tasks and streamlining the software creation process.
