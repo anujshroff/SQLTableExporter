@@ -1,6 +1,14 @@
 -- =============================================================================
--- Copy of docs/type_audit_bulk_test_data.sql with the USE preamble stripped.
--- The test fixture connects with InitialCatalog already set.
+-- Pagination-correctness fixture for SQLTableExporter integration tests.
+-- Loaded into the test container's database by DatabaseFixture as an embedded
+-- resource. Three tables with 500 rows each, deterministic in Id:
+--   * TypeAudit_Bulk_Standard      — full scalar-type coverage at scale.
+--   * TypeAudit_Bulk_HighPrecision — all 500 values past .NET decimal range.
+--   * TypeAudit_Bulk_UDT           — 500 distinct hierarchyid/geography/geometry.
+-- Edge-case interactions hit the QueryBatchSize=100 boundary on purpose:
+--   * every 50th row sets BitCol = NULL (NULL handling across batches)
+--   * every 100th row appends CR + NUL + comma + quote to string columns so
+--     the CSV-quoting fixes are exercised right on a keyset-page boundary.
 -- =============================================================================
 
 IF OBJECT_ID('dbo.TypeAudit_Bulk_Standard', 'U')      IS NOT NULL DROP TABLE dbo.TypeAudit_Bulk_Standard;

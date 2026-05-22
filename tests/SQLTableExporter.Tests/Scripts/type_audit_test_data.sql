@@ -1,6 +1,15 @@
 -- =============================================================================
--- Copy of docs/type_audit_test_data.sql with the CREATE DATABASE / USE preamble
--- stripped. The test fixture connects with InitialCatalog already set.
+-- Type-coverage / edge-case fixture for SQLTableExporter integration tests.
+-- Loaded into the test container's database by DatabaseFixture as an embedded
+-- resource. Three tables exercise:
+--   * TypeAudit_Standard      (6 rows) — every common scalar type, one row per
+--                                        edge axis (mins, maxes, NULLs, CR/NUL/
+--                                        comma/quote in strings, leap day, etc.)
+--   * TypeAudit_HighPrecision (2 rows) — DECIMAL(38,0) at and beyond .NET
+--                                        System.Decimal range.
+--   * TypeAudit_UDT           (1 row)  — hierarchyid, geography, geometry.
+-- The TestCase column on each row describes what it's testing so failures are
+-- easy to localize cell-by-cell.
 -- =============================================================================
 
 IF OBJECT_ID('dbo.TypeAudit_Standard', 'U')      IS NOT NULL DROP TABLE dbo.TypeAudit_Standard;
