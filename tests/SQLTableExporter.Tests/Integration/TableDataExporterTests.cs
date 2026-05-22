@@ -1,3 +1,6 @@
+using System.Globalization;
+using CsvHelper;
+using CsvHelper.Configuration;
 using Xunit;
 
 namespace SQLTableExporter.Tests.Integration;
@@ -47,15 +50,23 @@ public class TableDataExporterTests(DatabaseFixture db) : IDisposable
         MaxRowsPerFile = 1_000_000
     };
 
-    private static List<string[]> ReadCsvRows(string path)
+    private static List<List<string>> ReadCsvRows(string path)
     {
-        // Minimal CSV reader sufficient for our purposes: assumes embedded
-        // commas only inside quoted fields. We only inspect numeric/non-quoted
-        // columns, so naive split is safe for these specific assertions.
-        var rows = new List<string[]>();
-        foreach (var line in File.ReadAllLines(path))
+        // Use CsvHelper so quoted fields containing bare CR / NUL / comma /
+        // quote (the bug-#3 / bug-#5 fixtures) round-trip correctly. A naive
+        // File.ReadAllLines + Split(',') breaks because File.ReadAllLines
+        // splits on \r inside quoted fields.
+        using var reader = new StreamReader(path);
+        using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture));
+        var rows = new List<List<string>>();
+        while (csv.Read())
         {
-            rows.Add(line.Split(','));
+            var row = new List<string>();
+            for (int i = 0; csv.TryGetField<string>(i, out var v); i++)
+            {
+                row.Add(v ?? string.Empty);
+            }
+            rows.Add(row);
         }
         return rows;
     }
@@ -72,8 +83,8 @@ public class TableDataExporterTests(DatabaseFixture db) : IDisposable
             // Skip header row.
             foreach (var row in rows.Skip(1))
             {
-                if (row.Length == 0 || string.IsNullOrEmpty(row[0])) continue;
-                ids.Add(int.Parse(row[0]));
+                if (row.Count == 0 || string.IsNullOrEmpty(row[0])) continue;
+                ids.Add(int.Parse(row[0], CultureInfo.InvariantCulture));
             }
         }
         return ids;
@@ -235,8 +246,8 @@ public class TableDataExporterTests(DatabaseFixture db) : IDisposable
             var rows = ReadCsvRows(file);
             foreach (var row in rows.Skip(1))
             {
-                if (row.Length > 0 && !string.IsNullOrEmpty(row[0]))
-                    ids.Add(int.Parse(row[0]));
+                if (row.Count > 0 && !string.IsNullOrEmpty(row[0]))
+                    ids.Add(int.Parse(row[0], CultureInfo.InvariantCulture));
             }
         }
 

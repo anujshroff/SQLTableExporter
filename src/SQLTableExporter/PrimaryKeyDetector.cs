@@ -56,11 +56,12 @@ public static class PrimaryKeyDetector
             command.Parameters.AddWithValue("@table", table);
 
             List<string> pkColumns = [];
-            await using SqlDataReader reader = await command.ExecuteReaderAsync();
-
-            while (await reader.ReadAsync())
+            await using (SqlDataReader reader = await command.ExecuteReaderAsync())
             {
-                pkColumns.Add(reader.GetString(0));
+                while (await reader.ReadAsync())
+                {
+                    pkColumns.Add(reader.GetString(0));
+                }
             }
 
             if (pkColumns.Count == 0)
