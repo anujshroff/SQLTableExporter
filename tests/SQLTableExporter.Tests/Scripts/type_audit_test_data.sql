@@ -1,31 +1,22 @@
 -- =============================================================================
--- SQL -> CSV roundtrip test data for SQLTableExporter
---
--- Usage:
---   1. Run this script on a SQL Server instance.
---   2. Run SQLTableExporter against database TypeAuditDB, exporting the three
---      tables below.
---   3. Open the resulting CSV(s) and verify each row matches what was inserted
---      here. The TestCase column in each row describes what that row is testing.
---
--- The script is idempotent: it drops and recreates the tables on each run.
+-- Type-coverage / edge-case fixture for SQLTableExporter integration tests.
+-- Loaded into the test container's database by DatabaseFixture as an embedded
+-- resource. Three tables exercise:
+--   * TypeAudit_Standard      (6 rows) — every common scalar type, one row per
+--                                        edge axis (mins, maxes, NULLs, CR/NUL/
+--                                        comma/quote in strings, leap day, etc.)
+--   * TypeAudit_HighPrecision (2 rows) — DECIMAL(38,0) at and beyond .NET
+--                                        System.Decimal range.
+--   * TypeAudit_UDT           (1 row)  — hierarchyid, geography, geometry.
+-- The TestCase column on each row describes what it's testing so failures are
+-- easy to localize cell-by-cell.
 -- =============================================================================
-
-IF DB_ID('TypeAuditDB') IS NULL
-    EXEC ('CREATE DATABASE TypeAuditDB');
-GO
-
-USE TypeAuditDB;
-GO
 
 IF OBJECT_ID('dbo.TypeAudit_Standard', 'U')      IS NOT NULL DROP TABLE dbo.TypeAudit_Standard;
 IF OBJECT_ID('dbo.TypeAudit_HighPrecision', 'U') IS NOT NULL DROP TABLE dbo.TypeAudit_HighPrecision;
 IF OBJECT_ID('dbo.TypeAudit_UDT', 'U')           IS NOT NULL DROP TABLE dbo.TypeAudit_UDT;
 GO
 
--- =============================================================================
--- TypeAudit_Standard: every common scalar type
--- =============================================================================
 CREATE TABLE dbo.TypeAudit_Standard
 (
     Id                INT IDENTITY(1,1) PRIMARY KEY,
@@ -53,7 +44,7 @@ CREATE TABLE dbo.TypeAudit_Standard
     VarBinaryCol      VARBINARY(100)    NULL,
     VarBinaryMaxCol   VARBINARY(MAX)    NULL,
     ImageCol          IMAGE             NULL,
-    RowVersionCol     ROWVERSION        NOT NULL,  -- auto-generated
+    RowVersionCol     ROWVERSION        NOT NULL,
     UniqueIdCol       UNIQUEIDENTIFIER  NULL,
     DateCol           DATE              NULL,
     TimeCol           TIME(7)           NULL,
@@ -66,7 +57,6 @@ CREATE TABLE dbo.TypeAudit_Standard
 );
 GO
 
--- ---------- Row 1: minimums; strings contain comma ----------
 INSERT INTO dbo.TypeAudit_Standard (
     TestCase, BitCol, TinyIntCol, SmallIntCol, IntCol, BigIntCol,
     DecimalCol, NumericCol, MoneyCol, SmallMoneyCol, RealCol, FloatCol,
@@ -77,41 +67,21 @@ INSERT INTO dbo.TypeAudit_Standard (
     DateTime2Col, DateTimeOffsetCol, XmlCol, SqlVariantCol
 ) VALUES (
     N'Min values; strings contain comma',
-    0,
-    0,
-    -32768,
-    -2147483648,
-    -9223372036854775808,
-    -999999999999999999.9999999999,
-    -99999999999999.9999,
-    -922337203685477.5808,
-    -214748.3648,
-    CAST(-3.40E+38 AS REAL),
-    -1.79E+308,
-    'a,b,c     ',
-    'has,a,comma',
-    'text,with,commas',
-    N'a,b,c     ',
-    N'has,a,comma',
-    N'ntext,with,commas',
-    'varcharmax,with,commas',
-    N'nvarcharmax,with,commas',
-    0x0011223344556677,
-    0x0102,
-    0x0102030405060708,
-    0x09080706,
+    0, 0, -32768, -2147483648, -9223372036854775808,
+    -999999999999999999.9999999999, -99999999999999.9999,
+    -922337203685477.5808, -214748.3648,
+    CAST(-3.40E+38 AS REAL), -1.79E+308,
+    'a,b,c     ', 'has,a,comma', 'text,with,commas',
+    N'a,b,c     ', N'has,a,comma', N'ntext,with,commas',
+    'varcharmax,with,commas', N'nvarcharmax,with,commas',
+    0x0011223344556677, 0x0102, 0x0102030405060708, 0x09080706,
     '00000000-0000-0000-0000-000000000000',
-    '0001-01-01',
-    '00:00:00.0000000',
-    '1900-01-01 00:00:00',
-    '1753-01-01 00:00:00.000',
-    '0001-01-01 00:00:00.0000000',
-    '0001-01-01 00:00:00.0000000 -14:00',
-    CAST(N'<root attr="min,value"/>' AS XML),
-    CAST(0 AS INT)
+    '0001-01-01', '00:00:00.0000000',
+    '1900-01-01 00:00:00', '1753-01-01 00:00:00.000',
+    '0001-01-01 00:00:00.0000000', '0001-01-01 00:00:00.0000000 -14:00',
+    CAST(N'<root attr="min,value"/>' AS XML), CAST(0 AS INT)
 );
 
--- ---------- Row 2: maximums; strings contain double quote ----------
 INSERT INTO dbo.TypeAudit_Standard (
     TestCase, BitCol, TinyIntCol, SmallIntCol, IntCol, BigIntCol,
     DecimalCol, NumericCol, MoneyCol, SmallMoneyCol, RealCol, FloatCol,
@@ -122,41 +92,22 @@ INSERT INTO dbo.TypeAudit_Standard (
     DateTime2Col, DateTimeOffsetCol, XmlCol, SqlVariantCol
 ) VALUES (
     N'Max values; strings contain double quote',
-    1,
-    255,
-    32767,
-    2147483647,
-    9223372036854775807,
-    999999999999999999.9999999999,
-    99999999999999.9999,
-    922337203685477.5807,
-    214748.3647,
-    CAST(3.40E+38 AS REAL),
-    1.79E+308,
-    'a"b"c     ',
-    'has"a"quote',
-    'text"with"quotes',
-    N'a"b"c     ',
-    N'has"a"quote',
-    N'ntext"with"quotes',
-    'varcharmax"with"quotes',
-    N'nvarcharmax"with"quotes',
-    0xFFEEDDCCBBAA9988,
-    0xFFFE,
-    0xFFFEFDFCFBFAF9F8,
-    0xF7F6F5F4,
+    1, 255, 32767, 2147483647, 9223372036854775807,
+    999999999999999999.9999999999, 99999999999999.9999,
+    922337203685477.5807, 214748.3647,
+    CAST(3.40E+38 AS REAL), 1.79E+308,
+    'a"b"c     ', 'has"a"quote', 'text"with"quotes',
+    N'a"b"c     ', N'has"a"quote', N'ntext"with"quotes',
+    'varcharmax"with"quotes', N'nvarcharmax"with"quotes',
+    0xFFEEDDCCBBAA9988, 0xFFFE, 0xFFFEFDFCFBFAF9F8, 0xF7F6F5F4,
     'FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF',
-    '9999-12-31',
-    '23:59:59.9999999',
-    '2079-06-06 23:59:00',
-    '9999-12-31 23:59:59.997',
-    '9999-12-31 23:59:59.9999999',
-    '9999-12-31 23:59:59.9999999 +14:00',
+    '9999-12-31', '23:59:59.9999999',
+    '2079-06-06 23:59:00', '9999-12-31 23:59:59.997',
+    '9999-12-31 23:59:59.9999999', '9999-12-31 23:59:59.9999999 +14:00',
     CAST(N'<root attr="has &quot;quote&quot;"/>' AS XML),
     CAST(N'a string in a variant' AS NVARCHAR(100))
 );
 
--- ---------- Row 3: typical values; strings contain LF (CHAR(10)) ----------
 INSERT INTO dbo.TypeAudit_Standard (
     TestCase, BitCol, TinyIntCol, SmallIntCol, IntCol, BigIntCol,
     DecimalCol, NumericCol, MoneyCol, SmallMoneyCol, RealCol, FloatCol,
@@ -167,41 +118,21 @@ INSERT INTO dbo.TypeAudit_Standard (
     DateTime2Col, DateTimeOffsetCol, XmlCol, SqlVariantCol
 ) VALUES (
     N'Typical values; strings contain LF',
-    1,
-    42,
-    1234,
-    1234567,
-    1234567890123,
-    123.4500000000,
-    1234.5600,
-    1234.5600,
-    1234.5600,
-    CAST(3.1415927 AS REAL),
-    3.141592653589793,
-    'a' + CHAR(10) + 'b      ',
-    'first' + CHAR(10) + 'second',
-    'line1' + CHAR(10) + 'line2',
-    N'a' + NCHAR(10) + N'b      ',
-    N'first' + NCHAR(10) + N'second',
-    N'line1' + NCHAR(10) + N'line2',
-    'a' + CHAR(10) + 'b',
-    N'a' + NCHAR(10) + N'b',
-    0xDEADBEEFCAFEBABE,
-    0xCAFEBABE,
-    0xCAFEBABEDEADBEEF,
-    0xFEEDFACE,
+    1, 42, 1234, 1234567, 1234567890123,
+    123.4500000000, 1234.5600, 1234.5600, 1234.5600,
+    CAST(3.1415927 AS REAL), 3.141592653589793,
+    'a' + CHAR(10) + 'b      ', 'first' + CHAR(10) + 'second', 'line1' + CHAR(10) + 'line2',
+    N'a' + NCHAR(10) + N'b      ', N'first' + NCHAR(10) + N'second', N'line1' + NCHAR(10) + N'line2',
+    'a' + CHAR(10) + 'b', N'a' + NCHAR(10) + N'b',
+    0xDEADBEEFCAFEBABE, 0xCAFEBABE, 0xCAFEBABEDEADBEEF, 0xFEEDFACE,
     '550E8400-E29B-41D4-A716-446655440000',
-    '2024-06-15',
-    '14:30:45.1234567',
-    '2024-06-15 14:30:00',
-    '2024-06-15 14:30:45.123',
-    '2024-06-15 14:30:45.1234567',
-    '2024-06-15 14:30:45.1234567 -05:00',
+    '2024-06-15', '14:30:45.1234567',
+    '2024-06-15 14:30:00', '2024-06-15 14:30:45.123',
+    '2024-06-15 14:30:45.1234567', '2024-06-15 14:30:45.1234567 -05:00',
     CAST(N'<root>line1' + NCHAR(10) + N'line2</root>' AS XML),
     CAST('2024-06-15T14:30:45' AS DATETIME)
 );
 
--- ---------- Row 4: precision edges; strings contain BARE CR (bug #3) ----------
 INSERT INTO dbo.TypeAudit_Standard (
     TestCase, BitCol, TinyIntCol, SmallIntCol, IntCol, BigIntCol,
     DecimalCol, NumericCol, MoneyCol, SmallMoneyCol, RealCol, FloatCol,
@@ -212,44 +143,23 @@ INSERT INTO dbo.TypeAudit_Standard (
     DateTime2Col, DateTimeOffsetCol, XmlCol, SqlVariantCol
 ) VALUES (
     N'Precision edges; strings contain bare CR (bug #3)',
-    NULL,
-    1,
-    -1,
-    -1,
-    -1,
-    0.0000000001,
-    0.0001,
-    0.0001,
-    0.0001,
-    CAST(1.18E-38 AS REAL),       -- smallest positive normal real
-    2.23E-308,                     -- smallest positive normal float
-    'a' + CHAR(13) + 'b      ',
-    'split' + CHAR(13) + 'here',
-    'cr' + CHAR(13) + 'in text',
-    N'a' + NCHAR(13) + N'b      ',
-    N'split' + NCHAR(13) + N'here',
-    N'cr' + NCHAR(13) + N'in ntext',
-    'a' + CHAR(13) + 'b',
-    N'a' + NCHAR(13) + N'b',
-    0x0D0D0D0D0D0D0D0D,
-    0x0D,
-    0x0D0A,
-    0x0A0D,
+    NULL, 1, -1, -1, -1,
+    0.0000000001, 0.0001, 0.0001, 0.0001,
+    CAST(1.18E-38 AS REAL), 2.23E-308,
+    'a' + CHAR(13) + 'b      ', 'split' + CHAR(13) + 'here', 'cr' + CHAR(13) + 'in text',
+    N'a' + NCHAR(13) + N'b      ', N'split' + NCHAR(13) + N'here', N'cr' + NCHAR(13) + N'in ntext',
+    'a' + CHAR(13) + 'b', N'a' + NCHAR(13) + N'b',
+    0x0D0D0D0D0D0D0D0D, 0x0D, 0x0D0A, 0x0A0D,
     '11111111-2222-3333-4444-555555555555',
-    '2024-12-31',
-    '23:00:00.0000001',           -- 100ns granularity
-    '2024-12-31 23:00:00',
-    '2024-12-31 23:59:59.997',
-    '2024-12-31 23:59:59.9999999',
-    '2024-12-31 23:59:59.9999999 +00:00',
+    '2024-12-31', '23:00:00.0000001',
+    '2024-12-31 23:00:00', '2024-12-31 23:59:59.997',
+    '2024-12-31 23:59:59.9999999', '2024-12-31 23:59:59.9999999 +00:00',
     CAST(N'<root>cr' + NCHAR(13) + N'inside</root>' AS XML),
     CAST('99999999-8888-7777-6666-555555555555' AS UNIQUEIDENTIFIER)
 );
 
--- ---------- Row 5: all NULLs ----------
 INSERT INTO dbo.TypeAudit_Standard (TestCase) VALUES (N'All NULLs');
 
--- ---------- Row 6: unicode + embedded NUL (bug #5); leap day; non-hour offset ----------
 INSERT INTO dbo.TypeAudit_Standard (
     TestCase, BitCol, TinyIntCol, SmallIntCol, IntCol, BigIntCol,
     DecimalCol, NumericCol, MoneyCol, SmallMoneyCol, RealCol, FloatCol,
@@ -269,26 +179,16 @@ INSERT INTO dbo.TypeAudit_Standard (
     N'Greek O' + NCHAR(937) + N' NUL' + NCHAR(0) + N' CJK ' + NCHAR(22909),
     'a' + CHAR(0) + 'b',
     N'O' + NCHAR(937) + NCHAR(0) + NCHAR(22909) + NCHAR(0xD834) + NCHAR(0xDD1E),
-    0x0000000000000000,
-    0x00,
-    0x00FF00FF,
-    0xFF00FF00,
+    0x0000000000000000, 0x00, 0x00FF00FF, 0xFF00FF00,
     'A1B2C3D4-E5F6-7890-ABCD-EF1234567890',
-    '2000-02-29',                                  -- leap day
-    '12:00:00',
-    '2000-02-29 12:00:00',
-    '2000-02-29 12:00:00.000',
-    '2000-02-29 12:00:00.0000000',
-    '2000-02-29 12:00:00.0000000 +05:30',          -- non-hour-aligned offset
+    '2000-02-29', '12:00:00',
+    '2000-02-29 12:00:00', '2000-02-29 12:00:00.000',
+    '2000-02-29 12:00:00.0000000', '2000-02-29 12:00:00.0000000 +05:30',
     CAST(N'<root>Greek=' + NCHAR(937) + N' CJK=' + NCHAR(22909) + N'</root>' AS XML),
-    CAST(0x0102030405060708 AS VARBINARY(8))       -- variant holding bytes
+    CAST(0x0102030405060708 AS VARBINARY(8))
 );
 GO
 
--- =============================================================================
--- TypeAudit_HighPrecision: bug #1 - decimal values exceeding .NET decimal range
--- .NET System.Decimal max is ~7.92e28 (29 significant digits).
--- =============================================================================
 CREATE TABLE dbo.TypeAudit_HighPrecision
 (
     Id          INT IDENTITY(1,1) PRIMARY KEY,
@@ -297,22 +197,15 @@ CREATE TABLE dbo.TypeAudit_HighPrecision
 );
 GO
 
--- Row 1: 28 nines - within .NET decimal range, exports OK
 INSERT INTO dbo.TypeAudit_HighPrecision (TestCase, HighPrecCol)
 VALUES (N'In-range: decimal.MaxValue (29 digits, 7.92e28)',
         CAST('79228162514264337593543950335' AS DECIMAL(38, 0)));
 
--- Row 2: 29 nines - exceeds .NET decimal range, GetValue throws OverflowException
 INSERT INTO dbo.TypeAudit_HighPrecision (TestCase, HighPrecCol)
 VALUES (N'Out-of-range: 29 nines (~1e29) - bug #1 (export throws)',
         CAST('99999999999999999999999999999' AS DECIMAL(38, 0)));
 GO
 
--- =============================================================================
--- TypeAudit_UDT: bug #7 - exporter cannot read these without
--- Microsoft.SqlServer.Types reference. Export will throw at row read time.
--- Skip exporting this table if you don't want to reproduce the failure.
--- =============================================================================
 CREATE TABLE dbo.TypeAudit_UDT
 (
     Id             INT IDENTITY(1,1) PRIMARY KEY,
@@ -328,8 +221,4 @@ VALUES (N'Sample UDT row - bug #7 (export throws)',
         hierarchyid::Parse('/1/2/3/'),
         geography::STGeomFromText('POINT(-122.34900 47.65100)', 4326),
         geometry::STGeomFromText('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))', 0));
-GO
-
-PRINT 'Done. Run SQLTableExporter against database TypeAuditDB.';
-PRINT 'Compare each CSV row against the TestCase column to verify roundtrip.';
 GO
