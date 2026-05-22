@@ -32,6 +32,7 @@ public partial class DatabaseFixture : IAsyncLifetime
     public async ValueTask DisposeAsync()
     {
         await _container.DisposeAsync();
+        GC.SuppressFinalize(this);
     }
 
     private static async Task CreateDatabaseAsync(string masterConnectionString)

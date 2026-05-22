@@ -15,6 +15,7 @@ public class TableDataExporterTests(DatabaseFixture db) : IDisposable
         {
             Directory.Delete(_tempDir, recursive: true);
         }
+        GC.SuppressFinalize(this);
     }
 
     private ExportOptions BaseOptions(string table, string orderBy = "Id", int batchSize = 5000)

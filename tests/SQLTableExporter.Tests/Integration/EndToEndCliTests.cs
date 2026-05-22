@@ -17,6 +17,7 @@ public class EndToEndCliTests(DatabaseFixture db) : IDisposable
         {
             Directory.Delete(_tempDir, recursive: true);
         }
+        GC.SuppressFinalize(this);
     }
 
     // Program.Main is private inside an internal Program class — reach it via reflection

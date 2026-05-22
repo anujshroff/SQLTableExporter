@@ -16,6 +16,7 @@ public class SchemaScriptGeneratorTests(DatabaseFixture db) : IDisposable
         {
             Directory.Delete(_tempDir, recursive: true);
         }
+        GC.SuppressFinalize(this);
     }
 
     [Fact]
