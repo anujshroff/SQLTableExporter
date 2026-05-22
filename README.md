@@ -229,6 +229,27 @@ By default, the tool will:
 2. Ensure the output directory is empty before starting (unless using `--restart`)
 3. If archiving is enabled, create an archive file named `{schema}_{table}_export.zip` in the current working directory (i.e. the shell directory from which `sqltableexporter` was invoked)
 
+## Testing
+
+The test suite lives at [tests/SQLTableExporter.Tests/](tests/SQLTableExporter.Tests/) and runs on xUnit v3 + Microsoft Testing Platform. It is split into:
+
+- **Unit tests** (`Unit/`): pure-logic coverage for argument parsing, WHERE-condition parsing, keyset SQL generation, progress-file round-trips, and Azure Blob URL parsing. No external dependencies.
+- **Integration tests** (`Integration/`): drive a real SQL Server 2022 instance via [Testcontainers](https://dotnet.testcontainers.org/) and exercise primary-key detection, schema-script generation, keyset pagination, the full data-export pipeline, and an end-to-end CLI run.
+
+### Running locally
+
+Docker must be running for the integration tests to start the SQL Server container (~1.5 GB image pulled on first run).
+
+```bash
+dotnet build SQLTableExporter.slnx        # compile only — no Docker needed
+dotnet test SQLTableExporter.slnx          # full suite — needs Docker
+dotnet test --filter "FullyQualifiedName~Unit"   # unit tests only — no Docker
+```
+
+### Continuous integration
+
+Every push and pull request runs the full suite through [.github/workflows/ci.yml](.github/workflows/ci.yml) on `ubuntu-latest`, which has Docker available out of the box.
+
 ## AI Notice
 
 This project was entirely generated using AI, leveraging **Claude Code** by Anthropic. It serves as a testament to the capabilities of modern AI in automating complex development tasks and streamlining the software creation process.
