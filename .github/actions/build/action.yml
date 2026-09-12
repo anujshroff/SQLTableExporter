@@ -27,7 +27,7 @@ runs:
   using: 'composite'
   steps:
     - name: Setup .NET SDK
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@v6
       with:
         dotnet-version: ${{ inputs.DOTNET_CORE_VERSION }}
 
@@ -46,32 +46,34 @@ runs:
         tenant-id: ${{ inputs.AZURE_TENANT_ID }}
         subscription-id: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
 
-    - name: Install Sign CLI
-      run: dotnet tool install --global sign --prerelease
-      shell: bash
-
-    - name: Sign SQLTableExporter.dll
-      run: |
-        sign code artifact-signing `
-          -ase "${{ inputs.TRUSTED_SIGNING_ENDPOINT }}" `
-          -asa "${{ inputs.TRUSTED_SIGNING_ACCOUNT }}" `
-          -ascp "${{ inputs.TRUSTED_SIGNING_CERTIFICATE_PROFILE }}" `
-          src/SQLTableExporter/bin/${{ inputs.CONFIGURATION }}/net10.0/SQLTableExporter.dll
-      shell: pwsh
+    - name: Sign files with Artifact Signing
+      uses: azure/artifact-signing-action@v2
+      with:
+        endpoint: ${{ inputs.TRUSTED_SIGNING_ENDPOINT }}
+        signing-account-name: ${{ inputs.TRUSTED_SIGNING_ACCOUNT }}
+        certificate-profile-name: ${{ inputs.TRUSTED_SIGNING_CERTIFICATE_PROFILE }}
+        files: ${{ github.workspace }}/src/SQLTableExporter/bin/${{ inputs.CONFIGURATION }}/net10.0/SQLTableExporter.dll
+        file-digest: SHA256
+        timestamp-rfc3161: http://timestamp.acs.microsoft.com
+        timestamp-digest: SHA256
 
     - name: Nuget Pack
       run: |
           dotnet pack --no-build --no-restore -p:PackageVersion=${{ steps.nextversion.outputs.VERSION }} --configuration ${{ inputs.CONFIGURATION }} --output ${{ inputs.NUGET_DIRECTORY }}
       shell: bash
 
-    - name: Sign NuGet Package
-      run: |
-        sign code artifact-signing `
-          -ase "${{ inputs.TRUSTED_SIGNING_ENDPOINT }}" `
-          -asa "${{ inputs.TRUSTED_SIGNING_ACCOUNT }}" `
-          -ascp "${{ inputs.TRUSTED_SIGNING_CERTIFICATE_PROFILE }}" `
-          ${{ inputs.NUGET_DIRECTORY }}/*.nupkg
-      shell: pwsh
+
+    - name: Sign files with Artifact Signing
+      uses: azure/artifact-signing-action@v2
+      with:
+        endpoint: ${{ inputs.TRUSTED_SIGNING_ENDPOINT }}
+        signing-account-name: ${{ inputs.TRUSTED_SIGNING_ACCOUNT }}
+        certificate-profile-name: ${{ inputs.TRUSTED_SIGNING_CERTIFICATE_PROFILE }}
+        files-folder: ${{ inputs.NUGET_DIRECTORY }}
+        files-folder-filter: nupkg
+        file-digest: SHA256
+        timestamp-rfc3161: http://timestamp.acs.microsoft.com
+        timestamp-digest: SHA256
 
     - name: Extract Signing Certificate
       run: |
