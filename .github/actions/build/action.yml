@@ -62,7 +62,6 @@ runs:
           dotnet pack --no-build --no-restore -p:PackageVersion=${{ steps.nextversion.outputs.VERSION }} --configuration ${{ inputs.CONFIGURATION }} --output ${{ inputs.NUGET_DIRECTORY }}
       shell: bash
 
-
     - name: Sign files with Artifact Signing
       uses: azure/artifact-signing-action@v2
       with:
