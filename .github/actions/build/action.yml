@@ -62,17 +62,18 @@ runs:
           dotnet pack --no-build --no-restore -p:PackageVersion=${{ steps.nextversion.outputs.VERSION }} --configuration ${{ inputs.CONFIGURATION }} --output ${{ inputs.NUGET_DIRECTORY }}
       shell: bash
 
-    - name: Sign files with Artifact Signing
-      uses: azure/artifact-signing-action@v2
-      with:
-        endpoint: ${{ inputs.TRUSTED_SIGNING_ENDPOINT }}
-        signing-account-name: ${{ inputs.TRUSTED_SIGNING_ACCOUNT }}
-        certificate-profile-name: ${{ inputs.TRUSTED_SIGNING_CERTIFICATE_PROFILE }}
-        files-folder: ${{ inputs.NUGET_DIRECTORY }}
-        files-folder-filter: nupkg
-        file-digest: SHA256
-        timestamp-rfc3161: http://timestamp.acs.microsoft.com
-        timestamp-digest: SHA256
+    - name: Install Sign CLI
+      run: dotnet tool install --global sign
+      shell: bash
+
+    - name: Sign NuGet Package
+      run: |
+        sign code artifact-signing `
+          -ase "${{ inputs.TRUSTED_SIGNING_ENDPOINT }}" `
+          -asa "${{ inputs.TRUSTED_SIGNING_ACCOUNT }}" `
+          -ascp "${{ inputs.TRUSTED_SIGNING_CERTIFICATE_PROFILE }}" `
+          ${{ inputs.NUGET_DIRECTORY }}/*.nupkg
+      shell: pwsh
 
     - name: Extract Signing Certificate
       run: |
