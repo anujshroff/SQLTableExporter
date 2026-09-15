@@ -63,7 +63,7 @@ runs:
       shell: bash
 
     - name: Install Sign CLI
-      run: dotnet tool install --global sign
+      run: dotnet tool install --global sign --prerelease
       shell: bash
 
     - name: Sign NuGet Package
