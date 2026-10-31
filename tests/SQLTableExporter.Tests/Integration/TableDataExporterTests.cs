@@ -1,6 +1,5 @@
 using System.Globalization;
 using CsvHelper;
-using CsvHelper.Configuration;
 using Xunit;
 
 namespace SQLTableExporter.Tests.Integration;
@@ -56,15 +55,15 @@ public class TableDataExporterTests(DatabaseFixture db) : IDisposable
         // quote (the bug-#3 / bug-#5 fixtures) round-trip correctly. A naive
         // File.ReadAllLines + Split(',') breaks because File.ReadAllLines
         // splits on \r inside quoted fields.
-        using var reader = new StreamReader(path);
-        using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture));
+        // HasHeader is off so the header comes back as row 0, which the callers rely on.
+        using var csv = CsvReader.FromFile(path, new CsvReaderOptions { HasHeader = false, Separator = ',' });
         var rows = new List<List<string>>();
         while (csv.Read())
         {
-            var row = new List<string>();
-            for (int i = 0; csv.TryGetField<string>(i, out var v); i++)
+            var row = new List<string>(csv.FieldCount);
+            for (int i = 0; i < csv.FieldCount; i++)
             {
-                row.Add(v ?? string.Empty);
+                row.Add(csv.GetString(i));
             }
             rows.Add(row);
         }
