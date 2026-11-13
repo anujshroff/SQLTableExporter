@@ -15,7 +15,7 @@ A high-performance .NET CLI tool for exporting large SQL Server tables to CSV fi
 
 ## Requirements
 
-- .NET 10.0 runtime (Windows, Linux, or macOS)
+- .NET 11.0 runtime (Windows, Linux, or macOS)
 - SQL Server database access
 - Appropriate permissions to read from the tables you want to export
 

@@ -6,7 +6,7 @@ inputs:
     default: 'Release'
   DOTNET_CORE_VERSION:
     required: false
-    default: '10.x'
+    default: '11.x'
   AZURE_CLIENT_ID:
     required: true
   AZURE_TENANT_ID:
@@ -52,7 +52,7 @@ runs:
         endpoint: ${{ inputs.TRUSTED_SIGNING_ENDPOINT }}
         signing-account-name: ${{ inputs.TRUSTED_SIGNING_ACCOUNT }}
         certificate-profile-name: ${{ inputs.TRUSTED_SIGNING_CERTIFICATE_PROFILE }}
-        files: ${{ github.workspace }}/src/SQLTableExporter/bin/${{ inputs.CONFIGURATION }}/net10.0/SQLTableExporter.dll
+        files: ${{ github.workspace }}/src/SQLTableExporter/bin/${{ inputs.CONFIGURATION }}/net11.0/SQLTableExporter.dll
         file-digest: SHA256
         timestamp-rfc3161: http://timestamp.acs.microsoft.com
         timestamp-digest: SHA256
