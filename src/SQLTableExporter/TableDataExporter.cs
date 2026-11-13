@@ -1,5 +1,4 @@
 using CsvHelper;
-using CsvHelper.Configuration;
 using Microsoft.Data.SqlClient;
 using System.Data.SqlTypes;
 using System.Globalization;
@@ -24,6 +23,23 @@ public class TableDataExporter(ExportOptions options)
     private readonly WhereCondition? _whereCondition = options.ParsedWhereCondition;
     private readonly string _rawWhereCondition = options.RawWhereCondition;
     private readonly SchemaScriptGenerator _schemaScriptGenerator = new(options.ConnectionString, options.CommandTimeoutSeconds);
+
+    // CsvWriterOptions is an immutable record, so one instance is shared by every output file.
+    private static readonly CsvWriterOptions s_csvOptions = new()
+    {
+        Separator = ',',
+        NewLine = "\r\n",
+        // The files have always been written as UTF-8 without a byte order mark.
+        WriteByteOrderMark = false,
+        // Never rewrite raw data (e.g. values starting with '-', '=', '+' or '@').
+        Injection = CsvInjection.None,
+        // Use standard CSV quoting rules to handle fields containing commas, quotes or
+        // line breaks, plus NUL characters so they survive a round trip through the file.
+        ShouldQuote = (field, _, _, _) =>
+            field.Contains(',') || field.Contains('"') ||
+            field.Contains('\n') || field.Contains('\r') ||
+            field.Contains('\0'),
+    };
 
     public async Task ExportTableAsync(string schema, string table, string orderByColumns, string filePrefix, ExportProgressData progressData)
     {
@@ -206,7 +222,6 @@ public class TableDataExporter(ExportOptions options)
                 Console.WriteLine("Using saved order column values to resume export from last position");
             }
 
-            StreamWriter? writer = null;
             CsvWriter? csv = null;
             string currentOutputFile = "";
 
@@ -216,24 +231,21 @@ public class TableDataExporter(ExportOptions options)
                 try
                 {
                     // If we need to start a new file
-                    if (writer == null || rowsInCurrentFile >= _maxRowsPerFile)
+                    if (csv == null || rowsInCurrentFile >= _maxRowsPerFile)
                     {
                         // Close previous file if open
-                        if (writer != null)
+                        if (csv != null)
                         {
-                            // Make sure to dispose of writers properly
+                            // Make sure to dispose of the writer properly
                             try
                             {
-                                await csv!.FlushAsync();
-                                await writer.FlushAsync();
+                                await csv.FlushAsync();
                             }
                             finally
                             {
                                 // Always dispose even if flush fails
-                                await csv!.DisposeAsync();
-                                await writer.DisposeAsync();
+                                await csv.DisposeAsync();
                                 csv = null;
-                                writer = null;
                             }
 
                             Console.WriteLine($"\nCompleted file with {rowsInCurrentFile:N0} rows");
@@ -257,17 +269,7 @@ public class TableDataExporter(ExportOptions options)
                         currentOutputFile = Path.Combine(_outputDirectory, $"{filePrefix}_{fileNumber}.csv");
                         Console.WriteLine($"Creating new file: {currentOutputFile}");
 
-                        writer = new StreamWriter(currentOutputFile);
-                        csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
-                        {
-                            Delimiter = ",",
-                            // Use standard CSV quoting rules to handle fields containing commas
-                            ShouldQuote = args =>
-                                args.Field != null &&
-                                (args.Field.Contains(',') || args.Field.Contains('"') ||
-                                 args.Field.Contains('\n') || args.Field.Contains('\r') ||
-                                 args.Field.Contains('\0'))
-                        });
+                        csv = CsvWriter.ToFile(currentOutputFile, s_csvOptions);
 
                         // Get schema to write headers
                         await using SqlConnection schemaConnection = new(_connectionString);
@@ -284,7 +286,7 @@ public class TableDataExporter(ExportOptions options)
                             csv.WriteField(schemaReader.GetName(i));
                         }
 
-                        await csv.NextRecordAsync();
+                        await csv.EndRecordAsync();
                     }
 
                     // Generate SQL and parameters for the query
@@ -326,8 +328,7 @@ public class TableDataExporter(ExportOptions options)
                     int batchRowsProcessed = await ProcessKeysetBatchAsync(
                         query,
                         queryParameters,
-                        csv!,
-                        writer!,
+                        csv,
                         rowsInCurrentFile,
                         orderColumns,
                         sharedConnection,
@@ -366,12 +367,11 @@ public class TableDataExporter(ExportOptions options)
             }
 
             // Make sure to close the last file
-            if (csv != null && writer != null)
+            if (csv != null)
             {
                 try
                 {
                     await csv.FlushAsync();
-                    await writer.FlushAsync();
 
                     Console.WriteLine($"\nCompleted final file with {rowsInCurrentFile:N0} rows");
 
@@ -391,7 +391,6 @@ public class TableDataExporter(ExportOptions options)
                 finally
                 {
                     await csv.DisposeAsync();
-                    await writer.DisposeAsync();
                 }
             }
         }
@@ -426,7 +425,6 @@ public class TableDataExporter(ExportOptions options)
         string query,
         Dictionary<string, object> parameters,
         CsvWriter csv,
-        StreamWriter writer,
         int currentRowCount,
         List<KeysetPagination.OrderColumn> orderColumns,
         SqlConnection? sharedConnection = null,
@@ -502,7 +500,7 @@ public class TableDataExporter(ExportOptions options)
                     }
                 }
 
-                await csv.NextRecordAsync();
+                await csv.EndRecordAsync();
                 batchRowCount++;
                 rowsRead++;
 
@@ -514,7 +512,6 @@ public class TableDataExporter(ExportOptions options)
                 {
                     Console.Write($"\rRows processed in current batch: {batchRowCount:N0} ");
                     await csv.FlushAsync();
-                    await writer.FlushAsync();
                 }
             }
 
